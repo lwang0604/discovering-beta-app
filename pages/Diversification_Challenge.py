@@ -45,6 +45,10 @@ st.markdown(
     .lesson-limited {background:#fff4d6; border-left:7px solid #e0a000; color:#624800;}
     .lesson-mixed {background:#eef4fa; border-left:7px solid #547da3; color:#29465f;}
     .lesson-title {font-size:1.12rem; font-weight:850; margin-bottom:4px;}
+    .diminishing-card {background:#f3efff; border-left:7px solid #7656b5;
+                       border-radius:11px; padding:12px 16px; margin:5px 0 10px 0;
+                       color:#3e2d63; font-size:1rem; line-height:1.45;}
+    .diminishing-title {font-size:1.12rem; font-weight:850; margin-bottom:3px;}
     .selected-box {background:#eaf5fa; border:1px solid #b7d9e8; border-radius:10px;
                    padding:10px 14px; font-size:1rem;}
     .random-result {border-radius:8px; padding:7px 9px; margin:6px 0; font-size:.92rem;
@@ -402,6 +406,16 @@ with chart_col:
         ):
             st.session_state.show_risk_boxes = True
             st.rerun()
+    if all_sizes_selected and st.session_state.show_risk_boxes:
+        st.markdown(
+            '<div class="diminishing-card"><div class="diminishing-title">'
+            'Diminishing Diversification Benefit</div>'
+            'On average, portfolio risk falls as more stocks are added, but each additional stock '
+            'produces a smaller reduction in risk. The first few stocks provide the largest '
+            'diversification benefit; after roughly 40–50 stocks, adding more stocks usually does '
+            'little to reduce risk further.</div>',
+            unsafe_allow_html=True,
+        )
     x = results["N"]
     curve = go.Figure()
     curve.add_trace(go.Scatter(
