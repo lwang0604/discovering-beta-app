@@ -347,8 +347,8 @@ with chart_col:
     if all_sizes_selected and not st.session_state.show_risk_boxes:
         if st.button(
             "What should we conclude?\n"
-            "The first few stocks produce the biggest drop in risk; later additions provide smaller benefits.\n"
-            "Click this conclusion to continue →",
+            "On average, portfolio risk declines as stocks are added, but at a decreasing rate.\n"
+            "Click to reveal the two parts of total risk →",
             key="conclusion_reveal",
             width="stretch",
         ):
@@ -364,7 +364,7 @@ with chart_col:
     ))
     curve.add_trace(go.Scatter(
         x=x, y=results["Average_Volatility_Pct"], mode="lines+markers",
-        line=dict(color="#1769AA", width=3), name="Average of 1,000 random portfolios",
+        line=dict(color="#1769AA", width=3), name="Average of 1,000 randomly selected portfolios",
     ))
     spy_vol = float(results["SPY_Volatility_Pct"].iloc[0])
     curve.add_hline(
@@ -406,11 +406,17 @@ with chart_col:
 
     if all_sizes_selected and st.session_state.show_risk_boxes:
         curve.add_annotation(
+            xref="paper", yref="paper", x=.69, y=1.02, showarrow=False,
+            text="<b>Portfolio's Total Risk = Diversifiable Risk + Market Risk</b>",
+            font=dict(size=15, color="#153B57"),
+        )
+        curve.add_annotation(
             xref="paper", yref="paper", x=.69, y=.86, showarrow=False, align="left",
             text=(
                 "<b>Diversifiable Risk</b><br>"
-                "Firm-specific risk falls as more stocks are added.<br>"
-                "It can be reduced through diversification."
+                "The risk eliminated by adding stocks.<br>"
+                "It comes from random events unique to a particular firm.<br>"
+                "Examples: lawsuits, strikes, R&amp;D outcomes, and major contracts."
             ),
             bgcolor="#DFF3FB", bordercolor="#1769AA", borderwidth=2,
             borderpad=15, font=dict(size=16, color="#153B57"),
@@ -418,9 +424,11 @@ with chart_col:
         curve.add_annotation(
             xref="paper", yref="paper", x=.69, y=.34, showarrow=False, align="left",
             text=(
-                "<b>Market Risk — Cannot Be Diversified</b><br>"
-                "Economy-wide risk affects most stocks.<br>"
-                "It remains even in a large portfolio."
+                "<b>Market Risk</b><br>"
+                "The risk that remains even if the portfolio holds every stock.<br>"
+                "It comes from factors that systematically affect most firms.<br>"
+                "Examples: war, inflation, recessions, and high interest rates.<br>"
+                "<b>Market risk cannot be eliminated by diversification.</b>"
             ),
             bgcolor="#FFF0E8", bordercolor="#C43D3D", borderwidth=2,
             borderpad=15, font=dict(size=16, color="#6F2525"),
@@ -431,7 +439,7 @@ with chart_col:
     )
     curve.update_layout(
         height=500, margin=dict(l=58, r=20, t=20, b=48),
-        xaxis_title="Number of Stocks", yaxis_title="Annualized Portfolio Standard Deviation (%)",
+        xaxis_title="Number of Stocks", yaxis_title="Portfolio Risk, σₚ (%)",
         xaxis=dict(
             type="log", range=[0, np.log10(550)],
             tickvals=[1, 3, 10, 30, 100, 300, 500], gridcolor="#edf2f5",
