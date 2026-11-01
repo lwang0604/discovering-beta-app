@@ -57,31 +57,6 @@ returns, market, universe = load_data("gics-sectors-v1")
 company_to_ticker = dict(zip(universe["Company"], universe["Ticker"]))
 
 
-def possible_beta_explanation(sector: str, sub_industry: str, beta: float) -> str:
-    """Give every company a consistent sector-based teaching intuition."""
-    sector_drivers = {
-        "Information Technology": "technology demand, product cycles, and changing growth expectations",
-        "Communication Services": "advertising, subscriptions, consumer attention, and growth expectations",
-        "Consumer Discretionary": "household spending and the economic cycle",
-        "Consumer Staples": "relatively steady demand for everyday products",
-        "Energy": "oil and gas prices and global energy demand",
-        "Financials": "interest rates, credit conditions, and the economic cycle",
-        "Health Care": "health-care demand, product approvals, and innovation news",
-        "Industrials": "business investment, orders, and the economic cycle",
-        "Materials": "commodity prices, construction, and global industrial demand",
-        "Real Estate": "interest rates, financing conditions, and property demand",
-        "Utilities": "regulated prices and relatively steady demand for essential services",
-    }
-    drivers = sector_drivers.get(sector, "industry demand and changing economic expectations")
-    sensitivity = (
-        "greater-than-market sensitivity" if beta > 1.2 else
-        "lower-than-market sensitivity" if beta < 0.8 else
-        "market-like sensitivity"
-    )
-    industry_text = sub_industry if isinstance(sub_industry, str) and sub_industry else sector
-    return (f"Possible reason: companies in {industry_text} can be affected by {drivers}. "
-            f"That may help explain this stock's {sensitivity}.")
-
 st.title("Discovering Beta")
 st.markdown(
     '<div class="subtitle">Use real 2021–2025 daily stock returns to discover how strongly a company moves with the S&amp;P 500 market benchmark.</div>',
@@ -193,14 +168,19 @@ with lesson_col:
             together_words = "They often moved in opposite directions."
         relative_risk = stock_sd / market_sd
         relative_words = "more" if stock_sd > market_sd else "less"
-        beta_context = possible_beta_explanation(sector, sub_industry, beta)
+        sector_text = sector if isinstance(sector, str) and sector else "Not available"
+        sub_industry_text = sub_industry if isinstance(sub_industry, str) and sub_industry else "Not available"
 
         metrics = [
             (
                 "Beta (market sensitivity)", f"{beta:.2f}",
                 f"When the market moves by 1%, {ticker} has historically moved about "
                 f"{beta_size:.2f}% {beta_direction} the market, on average. "
-                f"{beta_context} This is a possible explanation, not proof of cause."
+                "This describes a historical relationship—not a prediction or an explanation of cause."
+            ),
+            (
+                "Company industry", sector_text,
+                f"GICS sector: {sector_text}. Sub-industry: {sub_industry_text}."
             ),
             (
                 "Do the stock and market move together?", f"{corr:.2f}",
