@@ -43,6 +43,13 @@ st.markdown(
                    padding:10px 14px; font-size:1rem;}
     .random-result {border-radius:8px; padding:7px 9px; margin:6px 0; font-size:.92rem;
                     background:#f7fafc; border:1px solid #d7e2e8;}
+    .st-key-conclusion_reveal button {background:#dff3fb !important; color:#153b57 !important;
+                    border:2px solid #1769aa !important; border-radius:12px !important;
+                    min-height:6.6rem !important; padding:12px 18px !important;
+                    font-size:1.08rem !important; line-height:1.45 !important;
+                    white-space:normal !important; text-align:left !important;}
+    .st-key-conclusion_reveal button:hover {background:#cdebf7 !important;
+                    border-color:#0f568c !important;}
     div.stButton > button {font-size:.96rem; font-weight:700; border-radius:9px;
                            min-height:2.3rem; padding:.3rem .55rem;}
     </style>
@@ -90,6 +97,8 @@ if "random_portfolio_results" not in st.session_state:
     st.session_state.random_portfolio_results = {}
 if "portfolio_selection_attempts" not in st.session_state:
     st.session_state.portfolio_selection_attempts = {size: 0 for size in [1, 3, 10, 30, 100]}
+if "show_risk_boxes" not in st.session_state:
+    st.session_state.show_risk_boxes = False
 
 st.markdown('<div class="course-banner">FIN 331 &nbsp;|&nbsp; Towson University</div>', unsafe_allow_html=True)
 st.title("Diversification Challenge")
@@ -314,6 +323,7 @@ with control_col:
             "tickers": random_tickers,
         }
         st.session_state.portfolio_selection_attempts[random_clicked] = attempt + 1
+        st.session_state.show_risk_boxes = False
         st.rerun()
 
     random_results = st.session_state.random_portfolio_results
@@ -328,10 +338,22 @@ with control_col:
             )
     if random_results and st.button("Clear random results", width="stretch"):
         st.session_state.random_portfolio_results = {}
+        st.session_state.show_risk_boxes = False
         st.rerun()
 
 with chart_col:
     st.subheader("How Does Portfolio Risk Change as We Add More Stocks?")
+    all_sizes_selected = all(size in random_results for size in random_sizes)
+    if all_sizes_selected and not st.session_state.show_risk_boxes:
+        if st.button(
+            "What should we conclude?\n"
+            "The first few stocks produce the biggest drop in risk; later additions provide smaller benefits.\n"
+            "Click this conclusion to continue →",
+            key="conclusion_reveal",
+            width="stretch",
+        ):
+            st.session_state.show_risk_boxes = True
+            st.rerun()
     x = results["N"]
     curve = go.Figure()
     curve.add_trace(go.Scatter(
@@ -382,17 +404,26 @@ with chart_col:
             ), name="Student-built portfolio",
         ))
 
-    if random_results:
+    if all_sizes_selected and st.session_state.show_risk_boxes:
         curve.add_annotation(
-            xref="paper", yref="paper", x=.70, y=.87, showarrow=False, align="left",
+            xref="paper", yref="paper", x=.69, y=.86, showarrow=False, align="left",
             text=(
-                "<b>What should we conclude?</b><br>"
-                "• The biggest drop in risk occurs when we add the first few stocks.<br>"
-                "• From 10 to 30 to 100 stocks, each addition provides a smaller benefit.<br>"
-                "• Risk levels off above zero because common market risk remains."
+                "<b>Diversifiable Risk</b><br>"
+                "Firm-specific risk falls as more stocks are added.<br>"
+                "It can be reduced through diversification."
             ),
             bgcolor="#DFF3FB", bordercolor="#1769AA", borderwidth=2,
-            borderpad=14, font=dict(size=15, color="#153B57"),
+            borderpad=15, font=dict(size=16, color="#153B57"),
+        )
+        curve.add_annotation(
+            xref="paper", yref="paper", x=.69, y=.34, showarrow=False, align="left",
+            text=(
+                "<b>Market Risk — Cannot Be Diversified</b><br>"
+                "Economy-wide risk affects most stocks.<br>"
+                "It remains even in a large portfolio."
+            ),
+            bgcolor="#FFF0E8", bordercolor="#C43D3D", borderwidth=2,
+            borderpad=15, font=dict(size=16, color="#6F2525"),
         )
 
     random_ymax = max(
