@@ -39,7 +39,8 @@ st.markdown(
 
 
 @st.cache_data
-def load_data() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+def load_data(data_version: str) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    _ = data_version  # Included in the cache key when the bundled data schema changes.
     prices = pd.read_parquet(ROOT / "adjusted_prices_2021_2025.parquet")
     prices.index = pd.to_datetime(prices.index)
     spy = pd.read_parquet(ROOT / "spy_adjusted_2021_2025.parquet")["SPY"]
@@ -52,7 +53,7 @@ def load_data() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     return returns, market, universe.sort_values(["Security", "Ticker"])
 
 
-returns, market, universe = load_data()
+returns, market, universe = load_data("gics-sectors-v1")
 company_to_ticker = dict(zip(universe["Company"], universe["Ticker"]))
 
 
