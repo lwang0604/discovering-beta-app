@@ -26,6 +26,9 @@ st.markdown(
                   padding:14px 16px; min-height:105px;}
     .metric-title {font-size:.92rem; color:#50636f; font-weight:700;}
     .metric-value {font-size:1.8rem; color:#123f5b; font-weight:800;}
+    .plain-language {background:#f7fbfd; border-left:5px solid #4b9cc5; border-radius:8px;
+                     padding:12px 14px; margin:-4px 0 14px 0; font-size:1rem;
+                     line-height:1.45; color:#263942;}
     .question {background:#fff3c4; border-left:7px solid #e5aa00; border-radius:8px;
                padding:13px 16px; font-size:1.05rem;}
     div.stButton > button {font-size:1.05rem; font-weight:700; border-radius:9px;}
@@ -90,10 +93,10 @@ if st.session_state.get("last_ticker") != ticker:
 
 b1, b2, _ = st.columns([1, 1, 3])
 with b1:
-    if st.button("Plot Returns", use_container_width=True, type="primary"):
+    if st.button("Plot Returns", width="stretch", type="primary"):
         st.session_state.revealed = False
 with b2:
-    if st.button("Reveal Beta", use_container_width=True):
+    if st.button("Reveal Beta", width="stretch"):
         st.session_state.revealed = True
 
 revealed = st.session_state.get("revealed", False)
@@ -132,7 +135,7 @@ with chart_col:
     )
     fig.update_xaxes(showgrid=True, gridcolor="#dce6ec")
     fig.update_yaxes(showgrid=True, gridcolor="#dce6ec")
-    st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
+    st.plotly_chart(fig, width="stretch", config={"displaylogo": False})
     st.caption(
         f"Real adjusted-price returns, 2021–2025 • {len(paired):,} paired trading days. "
         "Historical beta is an estimate, not a guarantee of future sensitivity."
@@ -146,16 +149,47 @@ with lesson_col:
             unsafe_allow_html=True,
         )
         st.write("")
+        beta_direction = "in the same direction as" if beta >= 0 else "in the opposite direction from"
+        beta_size = abs(beta)
+        corr_strength = (
+            "very strong" if abs(corr) >= 0.8 else
+            "strong" if abs(corr) >= 0.6 else
+            "moderate" if abs(corr) >= 0.3 else
+            "weak"
+        )
+        corr_direction = "positive" if corr > 0.05 else "negative" if corr < -0.05 else "near zero"
+        relative_risk = stock_sd / market_sd
+        relative_words = "more" if stock_sd > market_sd else "less"
+
         metrics = [
-            ("Beta: regression slope", f"{beta:.2f}"),
-            ("Correlation with market", f"{corr:.2f}"),
-            ("Stock annualized SD", f"{stock_sd:.1f}%"),
-            ("Market annualized SD", f"{market_sd:.1f}%"),
+            (
+                "Beta (market sensitivity)", f"{beta:.2f}",
+                f"When the market moves by 1%, {ticker} has historically moved about "
+                f"{beta_size:.2f}% {beta_direction} the market, on average. "
+                f"This is market-related risk—not a forecast of tomorrow's return."
+            ),
+            (
+                "Correlation with the market", f"{corr:.2f}",
+                f"{ticker} and the market had a {corr_strength} {corr_direction} linear relationship. "
+                "Correlation describes how consistently they move together; beta describes how much the stock moves."
+            ),
+            (
+                f"{ticker} annualized standard deviation", f"{stock_sd:.1f}%",
+                f"This measures {ticker}'s total volatility using daily returns, expressed on a one-year scale. "
+                "It is not an expected loss and does not mean the stock will move by this amount every year."
+            ),
+            (
+                "Market annualized standard deviation", f"{market_sd:.1f}%",
+                f"The S&P 500 benchmark's annualized volatility was {market_sd:.1f}%. "
+                f"Over this sample, {ticker} was about {relative_risk:.1f}× as volatile as the market "
+                f"({relative_words} total risk)."
+            ),
         ]
-        for title, value in metrics:
+        for title, value, explanation in metrics:
             st.markdown(
                 f'<div class="metric-card"><div class="metric-title">{title}</div>'
-                f'<div class="metric-value">{value}</div></div><br>',
+                f'<div class="metric-value">{value}</div></div>'
+                f'<div class="plain-language">{explanation}</div>',
                 unsafe_allow_html=True,
             )
     else:
