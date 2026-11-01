@@ -79,7 +79,7 @@ def possible_beta_explanation(sector: str, sub_industry: str, beta: float) -> st
         "market-like sensitivity"
     )
     industry_text = sub_industry if isinstance(sub_industry, str) and sub_industry else sector
-    return (f"Possible reason: {industry_text} companies can be affected by {drivers}. "
+    return (f"Possible reason: companies in {industry_text} can be affected by {drivers}. "
             f"That may help explain this stock's {sensitivity}.")
 
 st.title("Discovering Beta")
