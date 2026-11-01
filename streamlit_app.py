@@ -23,11 +23,11 @@ st.markdown(
     h1 {color: #153b57; margin-bottom: .1rem;}
     .subtitle {font-size: 1.15rem; color: #415463; margin-bottom: 1rem;}
     .metric-card {background:#eaf5fa; border:1px solid #b7d9e8; border-radius:12px;
-                  padding:14px 16px; min-height:105px;}
+                  padding:11px 14px; min-height:88px;}
     .metric-title {font-size:.92rem; color:#50636f; font-weight:700;}
     .metric-value {font-size:1.8rem; color:#123f5b; font-weight:800;}
     .plain-language {background:#f7fbfd; border-left:5px solid #4b9cc5; border-radius:8px;
-                     padding:12px 14px; margin:-4px 0 14px 0; font-size:1rem;
+                     padding:9px 12px; margin:-4px 0 11px 0; font-size:.94rem;
                      line-height:1.45; color:#263942;}
     .question {background:#fff3c4; border-left:7px solid #e5aa00; border-radius:8px;
                padding:13px 16px; font-size:1.05rem;}
@@ -55,6 +55,32 @@ def load_data() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
 returns, market, universe = load_data()
 company_to_ticker = dict(zip(universe["Company"], universe["Ticker"]))
 
+
+def possible_beta_explanation(sector: str, sub_industry: str, beta: float) -> str:
+    """Give every company a consistent sector-based teaching intuition."""
+    sector_drivers = {
+        "Information Technology": "technology demand, product cycles, and changing growth expectations",
+        "Communication Services": "advertising, subscriptions, consumer attention, and growth expectations",
+        "Consumer Discretionary": "household spending and the economic cycle",
+        "Consumer Staples": "relatively steady demand for everyday products",
+        "Energy": "oil and gas prices and global energy demand",
+        "Financials": "interest rates, credit conditions, and the economic cycle",
+        "Health Care": "health-care demand, product approvals, and innovation news",
+        "Industrials": "business investment, orders, and the economic cycle",
+        "Materials": "commodity prices, construction, and global industrial demand",
+        "Real Estate": "interest rates, financing conditions, and property demand",
+        "Utilities": "regulated prices and relatively steady demand for essential services",
+    }
+    drivers = sector_drivers.get(sector, "industry demand and changing economic expectations")
+    sensitivity = (
+        "greater-than-market sensitivity" if beta > 1.2 else
+        "lower-than-market sensitivity" if beta < 0.8 else
+        "market-like sensitivity"
+    )
+    industry_text = sub_industry if isinstance(sub_industry, str) and sub_industry else sector
+    return (f"Possible reason: {industry_text} companies can be affected by {drivers}. "
+            f"That may help explain this stock's {sensitivity}.")
+
 st.title("Discovering Beta")
 st.markdown(
     '<div class="subtitle">Use real 2021–2025 daily stock returns to discover how strongly a company moves with the S&amp;P 500 market benchmark.</div>',
@@ -79,6 +105,9 @@ with right:
 
 ticker = company_to_ticker[selected_company]
 name = selected_company.rsplit("  [", 1)[0]
+company_row = universe.loc[universe["Ticker"].eq(ticker)].iloc[0]
+sector = company_row.get("GICS Sector", "")
+sub_industry = company_row.get("GICS Sub-Industry", "")
 paired = pd.concat([market, returns[ticker].rename("Stock")], axis=1).dropna()
 x = paired["Market"].to_numpy() * 100
 y = paired["Stock"].to_numpy() * 100
@@ -151,37 +180,40 @@ with lesson_col:
         st.write("")
         beta_direction = "in the same direction as" if beta >= 0 else "in the opposite direction from"
         beta_size = abs(beta)
-        corr_strength = (
-            "very strong" if abs(corr) >= 0.8 else
-            "strong" if abs(corr) >= 0.6 else
-            "moderate" if abs(corr) >= 0.3 else
-            "weak"
-        )
-        corr_direction = "positive" if corr > 0.05 else "negative" if corr < -0.05 else "near zero"
+        if corr >= 0.6:
+            together_words = "They often moved in the same direction."
+        elif corr >= 0.3:
+            together_words = "They sometimes moved in the same direction, but not consistently."
+        elif corr > -0.3:
+            together_words = "There was no clear, consistent pattern in how they moved together."
+        elif corr > -0.6:
+            together_words = "They sometimes moved in opposite directions, but not consistently."
+        else:
+            together_words = "They often moved in opposite directions."
         relative_risk = stock_sd / market_sd
         relative_words = "more" if stock_sd > market_sd else "less"
+        beta_context = possible_beta_explanation(sector, sub_industry, beta)
 
         metrics = [
             (
                 "Beta (market sensitivity)", f"{beta:.2f}",
                 f"When the market moves by 1%, {ticker} has historically moved about "
                 f"{beta_size:.2f}% {beta_direction} the market, on average. "
-                f"This is market-related risk—not a forecast of tomorrow's return."
+                f"{beta_context} This is a possible explanation, not proof of cause."
             ),
             (
-                "Correlation with the market", f"{corr:.2f}",
-                f"{ticker} and the market had a {corr_strength} {corr_direction} linear relationship. "
-                "Correlation describes how consistently they move together; beta describes how much the stock moves."
+                "Do the stock and market move together?", f"{corr:.2f}",
+                f"{together_words} Use this simple scale: +1 means they move together, "
+                "0 means no clear pattern, and −1 means they move in opposite directions. "
+                "This score tells us how closely they move together—not how large the stock's moves are."
             ),
             (
-                f"{ticker} annualized standard deviation", f"{stock_sd:.1f}%",
-                f"This measures {ticker}'s total volatility using daily returns, expressed on a one-year scale. "
-                "It is not an expected loss and does not mean the stock will move by this amount every year."
+                f"{ticker}'s total volatility", f"{stock_sd:.1f}%",
+                "Higher % = larger price swings and more total risk. This is not an expected loss."
             ),
             (
-                "Market annualized standard deviation", f"{market_sd:.1f}%",
-                f"The S&P 500 benchmark's annualized volatility was {market_sd:.1f}%. "
-                f"Over this sample, {ticker} was about {relative_risk:.1f}× as volatile as the market "
+                "Market's total volatility", f"{market_sd:.1f}%",
+                f"For comparison, {ticker} was about {relative_risk:.1f}× as volatile as the market "
                 f"({relative_words} total risk)."
             ),
         ]
@@ -215,6 +247,7 @@ with st.expander("Method and data notes"):
         "- Daily adjusted closing prices, January 2021 through December 2025.\n"
         "- Market benchmark: SPY, used as a broad U.S. market proxy.\n"
         "- Beta is the OLS slope from stock daily return on SPY daily return.\n"
+        "- Total volatility is the annualized standard deviation of daily returns (daily SD × √252).\n"
         "- Current-constituent data may be subject to survivorship bias.\n"
         "- The app is designed for classroom illustration, not investment advice."
     )
