@@ -11,6 +11,13 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 ANNUALIZATION = np.sqrt(252) * 100
 
+# Two pre-screened teaching sequences made only from real stocks and real returns.
+# Their prefix portfolios at N = 1, 3, 10, 30, and 100 have declining volatility.
+GUIDED_PORTFOLIOS = [
+    "HWKN,HNI,HAYW,IBM,PVH,FANG,LTC,BBY,TEL,WRLD,NMIH,AN,HTH,PDFS,JBTM,HRMY,AUB,ENTG,TOL,UE,TDC,AME,RDN,INSW,PTGX,FND,LMT,LDOS,BSY,FHB,KFY,FLG,TPL,QNST,CELH,PSX,GAP,AVNT,FOX,EHC,GOOGL,PKG,CHRD,MMS,TTMI,CWST,CNR,REGN,ETR,AGX,DNOW,GNL,META,EAT,KNSL,FRPT,AMP,ACIW,UCTT,AVA,FFBC,RNST,CRL,LGND,PLXS,VSAT,OC,EGP,CNO,AHCO,IR,TMO,REZI,LYB,HLI,GEN,PGR,ROKU,EVRG,CNC,STC,RTX,BWXT,SPHR,MARA,RRC,HUBB,RGLD,AVGO,CVBF,COHU,ON,BKH,CBU,CARG,ES,GGG,ADEA,TMDX,XOM".split(","),
+    "LZB,PFG,FIVN,NMIH,HRL,PENN,PZZA,MA,ENOV,MANH,BOOT,SBRA,HOMB,EPAC,ZBH,BOX,WEC,AMSF,ENR,AROC,KMPR,SNDR,PFE,CRI,MRSH,NEO,HASI,ADUS,EIX,IVZ,CRM,ANF,LOPE,EBC,CRC,MTDR,EL,EME,ADM,CNX,WMS,WDAY,HAS,JOE,CRL,USB,OMCL,MEDP,ARR,EXEL,CB,DVN,SABR,OVV,SPG,CBU,UCB,MNST,DELL,CCS,TXRH,WAT,HIW,GIS,OKTA,ALLY,NEM,AAMI,PYPL,DD,NVDA,BLK,AFG,COLL,V,BFH,MKTX,ACM,MGEE,UCTT,GL,WSO,HZO,ECPG,ELS,CBOE,ALRM,HUBB,PBF,CMCSA,BCO,COHU,SBSI,MCK,FSLR,PRIM,EW,MGY,EPAM,TR".split(","),
+]
+
 st.set_page_config(
     page_title="Diversification Challenge", page_icon="🧺", layout="wide",
     initial_sidebar_state="collapsed",
@@ -81,6 +88,8 @@ if "custom_weight_result" not in st.session_state:
     st.session_state.custom_weight_result = None
 if "random_portfolio_results" not in st.session_state:
     st.session_state.random_portfolio_results = {}
+if "portfolio_selection_attempts" not in st.session_state:
+    st.session_state.portfolio_selection_attempts = {size: 0 for size in [1, 3, 10, 30, 100]}
 
 st.markdown('<div class="course-banner">FIN 331 &nbsp;|&nbsp; Towson University</div>', unsafe_allow_html=True)
 st.title("Diversification Challenge")
@@ -267,7 +276,7 @@ if comparison:
     )
     st.plotly_chart(bar, width="stretch", config={"displaylogo": False})
 
-st.markdown("### Random Portfolio Experiment")
+st.markdown("### Portfolio Size Experiment")
 control_col, chart_col = st.columns([0.82, 4.18], gap="medium")
 random_sizes = [1, 3, 10, 30, 100]
 random_palette = {
@@ -277,22 +286,26 @@ random_icons = {1: "🔵", 3: "🟡", 10: "🟢", 30: "🔴", 100: "⚫"}
 
 with control_col:
     st.markdown("**Select a portfolio size**")
-    st.caption("Each click draws a new equally weighted portfolio from real stocks.")
+    st.caption("Select a real equally weighted portfolio at each size.")
     random_clicked = None
     for size in random_sizes:
         if st.button(
-            f"{random_icons[size]}  Random select {size}",
+            f"{random_icons[size]}  Select {size}",
             key=f"random_side_{size}",
             width="stretch",
         ):
             random_clicked = size
 
     if random_clicked is not None:
-        eligible = returns.columns[returns.notna().sum() >= 1200]
-        rng = np.random.default_rng()
-        random_tickers = rng.choice(
-            eligible.to_numpy(), size=random_clicked, replace=False
-        ).tolist()
+        attempt = st.session_state.portfolio_selection_attempts.get(random_clicked, 0)
+        if attempt < len(GUIDED_PORTFOLIOS):
+            random_tickers = GUIDED_PORTFOLIOS[attempt][:random_clicked]
+        else:
+            eligible = returns.columns[returns.notna().sum() >= 1200]
+            rng = np.random.default_rng()
+            random_tickers = rng.choice(
+                eligible.to_numpy(), size=random_clicked, replace=False
+            ).tolist()
         random_returns = returns[random_tickers].dropna().mean(axis=1)
         random_sd = annualized_sd(random_returns)
         st.session_state.random_portfolio_results[random_clicked] = {
@@ -300,6 +313,7 @@ with control_col:
             "sd": random_sd,
             "tickers": random_tickers,
         }
+        st.session_state.portfolio_selection_attempts[random_clicked] = attempt + 1
         st.rerun()
 
     random_results = st.session_state.random_portfolio_results
@@ -370,17 +384,15 @@ with chart_col:
 
     if random_results:
         curve.add_annotation(
-            xref="paper", yref="paper", x=.68, y=.88, showarrow=False, align="left",
+            xref="paper", yref="paper", x=.70, y=.87, showarrow=False, align="left",
             text=(
                 "<b>What should we conclude?</b><br>"
-                "Start with one stock, then compare N=3 and N=10.<br>"
-                "The first few stocks provide the largest<br>"
-                "diversification benefit. As more stocks are<br>"
-                "added, the extra risk reduction gets smaller.<br>"
-                "Common market risk remains."
+                "• The biggest drop in risk occurs when we add the first few stocks.<br>"
+                "• From 10 to 30 to 100 stocks, each addition provides a smaller benefit.<br>"
+                "• Risk levels off above zero because common market risk remains."
             ),
             bgcolor="#DFF3FB", bordercolor="#1769AA", borderwidth=2,
-            borderpad=9, font=dict(size=12, color="#153B57"),
+            borderpad=14, font=dict(size=15, color="#153B57"),
         )
 
     random_ymax = max(
