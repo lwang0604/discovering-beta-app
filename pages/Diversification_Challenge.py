@@ -39,6 +39,12 @@ st.markdown(
     .movement-title {font-size:1.05rem; font-weight:750; color:#263942;}
     .movement-value {font-size:2.35rem; font-weight:850; color:#153b57; line-height:1.15;}
     .movement-note {font-size:.94rem; color:#334851; margin-top:5px;}
+    .lesson-card {border-radius:11px; padding:14px 17px; margin:12px 0 16px 0;
+                  font-size:1rem; line-height:1.5;}
+    .lesson-strong {background:#e8f7ee; border-left:7px solid #2ca25f; color:#174b2c;}
+    .lesson-limited {background:#fff4d6; border-left:7px solid #e0a000; color:#624800;}
+    .lesson-mixed {background:#eef4fa; border-left:7px solid #547da3; color:#29465f;}
+    .lesson-title {font-size:1.12rem; font-weight:850; margin-bottom:4px;}
     .selected-box {background:#eaf5fa; border:1px solid #b7d9e8; border-radius:10px;
                    padding:10px 14px; font-size:1rem;}
     .random-result {border-radius:8px; padding:7px 9px; margin:6px 0; font-size:.92rem;
@@ -261,6 +267,48 @@ if comparison:
         f'<div class="movement-note">{movement_note}</div></div>',
         unsafe_allow_html=True,
     )
+
+    if before_sd is not None:
+        correlation = comparison["correlation"]
+        stock_sd = comparison["stock_sd"]
+        risk_reduction = before_sd - after_sd
+        if risk_reduction <= 0:
+            lesson_class = "lesson-mixed"
+            lesson_title = "No risk reduction from this addition"
+            lesson_text = (
+                f"{ticker} did not lower portfolio risk in this case. Its correlation with the existing "
+                f"portfolio is {correlation:.2f}, and its stand-alone risk is {stock_sd:.2f}%. "
+                "Adding another stock does not guarantee that portfolio risk will fall."
+            )
+        elif correlation >= 0.65:
+            lesson_class = "lesson-limited"
+            lesson_title = "Limited diversification benefit"
+            lesson_text = (
+                f"{ticker} has a relatively high correlation ({correlation:.2f}) with the existing portfolio, "
+                f"so it tends to move with the stocks already held. Portfolio risk fell by only "
+                f"{risk_reduction:.2f} percentage points."
+            )
+        elif stock_sd < before_sd:
+            lesson_class = "lesson-strong"
+            lesson_title = "Stronger diversification benefit"
+            lesson_text = (
+                f"{ticker} has a lower correlation ({correlation:.2f}) with the existing portfolio and lower "
+                f"stand-alone risk ({stock_sd:.2f}% versus {before_sd:.2f}%). Together, these features reduced "
+                f"portfolio risk by {risk_reduction:.2f} percentage points."
+            )
+        else:
+            lesson_class = "lesson-mixed"
+            lesson_title = "A mixed diversification effect"
+            lesson_text = (
+                f"The lower correlation ({correlation:.2f}) helps diversification, but {ticker}'s stand-alone "
+                f"risk of {stock_sd:.2f}% limits the overall risk reduction."
+            )
+        st.markdown(
+            f'<div class="lesson-card {lesson_class}"><div class="lesson-title">{lesson_title}</div>'
+            f'{lesson_text}<br><b>Textbook connection:</b> Stocks with lower correlations and lower stand-alone '
+            'risk tend to make portfolio risk decline faster.</div>',
+            unsafe_allow_html=True,
+        )
 
     labels = [f"{ticker}<br>alone"]
     values = [comparison["stock_sd"]]
