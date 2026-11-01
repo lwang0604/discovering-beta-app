@@ -28,6 +28,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.sidebar:
+    st.header("Classroom Apps")
+    st.page_link("streamlit_app.py", label="Discovering Beta", icon="📈")
+    st.page_link("pages/Diversification_Challenge.py", label="Diversification Challenge", icon="🧺")
+
 
 @st.cache_data
 def load_data(version: str):
