@@ -118,8 +118,9 @@ if add_clicked:
 
 selected = st.session_state.portfolio_tickers
 if selected:
+    stock_word = "stock" if len(selected) == 1 else "stocks"
     st.markdown(
-        f'<div class="selected-box"><b>Current portfolio ({len(selected)} stocks):</b> '
+        f'<div class="selected-box"><b>Current portfolio ({len(selected)} {stock_word}):</b> '
         + ", ".join(selected) + "</div>",
         unsafe_allow_html=True,
     )
