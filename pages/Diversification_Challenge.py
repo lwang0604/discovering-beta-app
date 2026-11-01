@@ -11,16 +11,20 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 ANNUALIZATION = np.sqrt(252) * 100
 
-st.set_page_config(page_title="Diversification Challenge", page_icon="🧺", layout="wide")
+st.set_page_config(
+    page_title="Diversification Challenge", page_icon="🧺", layout="wide",
+    initial_sidebar_state="collapsed",
+)
 st.markdown(
     """
     <style>
-    .block-container {padding-top:1.4rem; padding-bottom:2rem; max-width:1450px;}
-    .course-banner {font-size:1.08rem; font-weight:800; letter-spacing:.04em; color:#ffffff;
+    .block-container {padding-top:.45rem; padding-bottom:1rem; max-width:1450px;}
+    .course-banner {font-size:.98rem; font-weight:800; letter-spacing:.04em; color:#ffffff;
                     background:#153b57; border-left:8px solid #8ecae0; border-radius:8px;
-                    padding:9px 14px; margin:0 0 .65rem 0;}
-    h1 {color:#153b57; margin-bottom:.1rem;}
-    .subtitle {font-size:1.12rem; color:#415463; margin-bottom:1rem;}
+                    padding:6px 12px; margin:0 0 .35rem 0;}
+    h1 {color:#153b57; margin:.1rem 0; font-size:2.1rem !important; line-height:1.12 !important;}
+    h3 {font-size:1.5rem !important; line-height:1.18 !important;}
+    .subtitle {font-size:.98rem; color:#415463; margin-bottom:.45rem;}
     .result-box {background:#fff3c4; border-left:7px solid #e5aa00; border-radius:9px;
                  padding:13px 16px; font-size:1.03rem; line-height:1.5;}
     .movement-card {background:#ffe66d; border:1px solid #dfbd24; border-radius:12px;
@@ -30,16 +34,10 @@ st.markdown(
     .movement-note {font-size:.94rem; color:#334851; margin-top:5px;}
     .selected-box {background:#eaf5fa; border:1px solid #b7d9e8; border-radius:10px;
                    padding:10px 14px; font-size:1rem;}
-    @keyframes insightPulse {
-        0% {box-shadow:0 0 0 0 rgba(23,105,170,.35);}
-        70% {box-shadow:0 0 0 10px rgba(23,105,170,0);}
-        100% {box-shadow:0 0 0 0 rgba(23,105,170,0);}
-    }
-    .insight-box {background:#dff3fb; border:2px solid #1769aa; border-radius:12px;
-                  padding:15px 18px; margin:12px 0 16px 0; font-size:1.05rem;
-                  line-height:1.5; animation:insightPulse 1.25s ease-out 2;}
-    .insight-title {font-size:1.18rem; font-weight:850; color:#153b57; margin-bottom:4px;}
-    div.stButton > button {font-size:1.03rem; font-weight:700; border-radius:9px;}
+    .random-result {border-radius:8px; padding:7px 9px; margin:6px 0; font-size:.92rem;
+                    background:#f7fafc; border:1px solid #d7e2e8;}
+    div.stButton > button {font-size:.96rem; font-weight:700; border-radius:9px;
+                           min-height:2.3rem; padding:.3rem .55rem;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -81,8 +79,8 @@ if "weight_version" not in st.session_state:
     st.session_state.weight_version = 0
 if "custom_weight_result" not in st.session_state:
     st.session_state.custom_weight_result = None
-if "random_portfolio_result" not in st.session_state:
-    st.session_state.random_portfolio_result = None
+if "random_portfolio_results" not in st.session_state:
+    st.session_state.random_portfolio_results = {}
 
 st.markdown('<div class="course-banner">FIN 331 &nbsp;|&nbsp; Towson University</div>', unsafe_allow_html=True)
 st.title("Diversification Challenge")
@@ -91,31 +89,25 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-left, right = st.columns([3.2, 1], gap="large")
-with left:
-    chosen_company = st.selectbox(
-        "Search for a company",
-        universe["Company"].tolist(),
-        help="Start typing a company name or ticker.",
-    )
-with right:
-    st.write("")
-    st.write("")
-    add_clicked = st.button("＋ Add Company", type="primary", width="stretch")
+with st.expander(
+    "Build Your Own Portfolio (optional)",
+    expanded=bool(st.session_state.portfolio_tickers),
+):
+    left, right = st.columns([3.2, 1], gap="large")
+    with left:
+        chosen_company = st.selectbox(
+            "Search for a company",
+            universe["Company"].tolist(),
+            help="Start typing a company name or ticker.",
+        )
+    with right:
+        st.write("")
+        st.write("")
+        add_clicked = st.button("＋ Add Company", type="primary", width="stretch")
 
-clear_col, spacer = st.columns([1, 4])
-with clear_col:
-    clear_clicked = st.button("Clear Portfolio", width="stretch")
-
-st.markdown("#### Random Portfolio Experiment")
-st.caption("Choose a portfolio size. The app will randomly select real stocks, weight them equally, and plot the result below.")
-random_cols = st.columns(4)
-random_sizes = [3, 10, 30, 100]
-random_clicked = None
-for col, size in zip(random_cols, random_sizes):
-    with col:
-        if st.button(f"Random {size} Stocks", key=f"random_{size}", width="stretch"):
-            random_clicked = size
+    clear_col, spacer = st.columns([1, 4])
+    with clear_col:
+        clear_clicked = st.button("Clear Portfolio", width="stretch")
 
 if clear_clicked:
     st.session_state.portfolio_tickers = []
@@ -123,28 +115,6 @@ if clear_clicked:
     st.session_state.last_comparison = None
     st.session_state.portfolio_weights = {}
     st.session_state.custom_weight_result = None
-    st.session_state.random_portfolio_result = None
-    st.session_state.weight_version += 1
-    st.rerun()
-
-if random_clicked is not None:
-    eligible = returns.columns[returns.notna().sum() >= 1200]
-    rng = np.random.default_rng()
-    random_tickers = rng.choice(eligible.to_numpy(), size=random_clicked, replace=False).tolist()
-    random_returns = returns[random_tickers].dropna().mean(axis=1)
-    random_sd = annualized_sd(random_returns)
-    st.session_state.portfolio_tickers = random_tickers
-    st.session_state.portfolio_weights = {
-        symbol: 1 / random_clicked for symbol in random_tickers
-    }
-    st.session_state.portfolio_history = [(random_clicked, random_sd)]
-    st.session_state.last_comparison = None
-    st.session_state.custom_weight_result = None
-    st.session_state.random_portfolio_result = {
-        "size": random_clicked,
-        "sd": random_sd,
-        "tickers": random_tickers,
-    }
     st.session_state.weight_version += 1
     st.rerun()
 
@@ -176,7 +146,6 @@ if add_clicked:
         total = len(selected)
         st.session_state.portfolio_weights = {symbol: 1 / total for symbol in selected}
         st.session_state.custom_weight_result = None
-        st.session_state.random_portfolio_result = None
         st.session_state.weight_version += 1
         st.session_state.portfolio_history.append((total, after_sd))
         st.session_state.last_comparison = {
@@ -196,30 +165,6 @@ if selected:
         + displayed_tickers + "</div>",
         unsafe_allow_html=True,
     )
-
-    random_result = st.session_state.random_portfolio_result
-    if random_result:
-        st.success(
-            f"Random {random_result['size']}-stock portfolio risk: "
-            f"{random_result['sd']:.2f}% annualized standard deviation. "
-            "The orange star on the curve shows this portfolio."
-        )
-        insight_by_size = {
-            3: "The first few stocks can remove a large amount of firm-specific risk. "
-               "This is where diversification usually produces its biggest gains.",
-            10: "Diversification is still helping, but each additional stock usually reduces risk by less "
-                "than the stocks added at the beginning.",
-            30: "The curve is becoming flatter. Much of the firm-specific risk has already been diversified away, "
-                "so adding more stocks provides a smaller extra benefit.",
-            100: "This portfolio is on the flat part of the curve. Adding still more stocks may provide only a small "
-                 "additional reduction because common market risk remains.",
-        }
-        st.markdown(
-            '<div class="insight-box"><div class="insight-title">What should we conclude?</div>'
-            f'{insight_by_size[random_result["size"]]}<br><b>Key idea:</b> The first few stocks provide the '
-            'largest diversification benefit; the benefit gets smaller as more stocks are added.</div>',
-            unsafe_allow_html=True,
-        )
 
     if len(selected) <= 30:
         with st.expander("Change Portfolio Weights", expanded=False):
@@ -265,9 +210,6 @@ if selected:
             f"Custom-weight portfolio risk: {custom_result['sd']:.2f}% annualized standard deviation. "
             f"Weights: {weight_text}."
         )
-else:
-    st.info("No companies selected yet. Add the first company to begin.")
-
 comparison = st.session_state.last_comparison
 if comparison:
     st.subheader(f"What happened when we added {comparison['ticker']}?")
@@ -325,42 +267,137 @@ if comparison:
     )
     st.plotly_chart(bar, width="stretch", config={"displaylogo": False})
 
-st.subheader("How Does Portfolio Risk Change as We Add More Stocks?")
-x = results["N"]
-curve = go.Figure()
-curve.add_trace(go.Scatter(
-    x=pd.concat([x, x.iloc[::-1]]),
-    y=pd.concat([results["P95_Volatility_Pct"], results["P05_Volatility_Pct"].iloc[::-1]]),
-    fill="toself", fillcolor="rgba(169,216,245,.55)", line=dict(color="rgba(0,0,0,0)"),
-    name="5th–95th percentile", hoverinfo="skip",
-))
-curve.add_trace(go.Scatter(
-    x=x, y=results["Average_Volatility_Pct"], mode="lines+markers",
-    line=dict(color="#1769AA", width=3), name="Average of 1,000 random portfolios",
-))
-spy_vol = float(results["SPY_Volatility_Pct"].iloc[0])
-curve.add_hline(
-    y=spy_vol, line=dict(color="#C43D3D", width=2, dash="dash"),
-    annotation_text=f"S&P 500 market benchmark: {spy_vol:.1f}%",
-    annotation_position="bottom right",
-)
-history = st.session_state.portfolio_history
-if history:
-    hx, hy = zip(*history)
+st.markdown("### Random Portfolio Experiment")
+control_col, chart_col = st.columns([0.82, 4.18], gap="medium")
+random_sizes = [1, 3, 10, 30, 100]
+random_palette = {
+    1: "#2878B5", 3: "#F4C542", 10: "#2CA25F", 30: "#D94343", 100: "#111111"
+}
+random_icons = {1: "🔵", 3: "🟡", 10: "🟢", 30: "🔴", 100: "⚫"}
+
+with control_col:
+    st.markdown("**Select a portfolio size**")
+    st.caption("Each click draws a new equally weighted portfolio from real stocks.")
+    random_clicked = None
+    for size in random_sizes:
+        if st.button(
+            f"{random_icons[size]}  Random select {size}",
+            key=f"random_side_{size}",
+            width="stretch",
+        ):
+            random_clicked = size
+
+    if random_clicked is not None:
+        eligible = returns.columns[returns.notna().sum() >= 1200]
+        rng = np.random.default_rng()
+        random_tickers = rng.choice(
+            eligible.to_numpy(), size=random_clicked, replace=False
+        ).tolist()
+        random_returns = returns[random_tickers].dropna().mean(axis=1)
+        random_sd = annualized_sd(random_returns)
+        st.session_state.random_portfolio_results[random_clicked] = {
+            "size": random_clicked,
+            "sd": random_sd,
+            "tickers": random_tickers,
+        }
+        st.rerun()
+
+    random_results = st.session_state.random_portfolio_results
+    for size in random_sizes:
+        if size in random_results:
+            result = random_results[size]
+            st.markdown(
+                f'<div class="random-result"><span style="color:{random_palette[size]};'
+                f'font-size:1.25rem">★</span> <b>{size} stocks:</b> '
+                f'{result["sd"]:.2f}%</div>',
+                unsafe_allow_html=True,
+            )
+    if random_results and st.button("Clear random results", width="stretch"):
+        st.session_state.random_portfolio_results = {}
+        st.rerun()
+
+with chart_col:
+    st.subheader("How Does Portfolio Risk Change as We Add More Stocks?")
+    x = results["N"]
+    curve = go.Figure()
     curve.add_trace(go.Scatter(
-        x=hx, y=hy, mode="markers+text", text=[f"N={n}" for n in hx],
-        textposition="top center", marker=dict(symbol="star", size=15, color="#F0A202",
-        line=dict(color="#8A5700", width=1)), name="Your portfolio result",
+        x=pd.concat([x, x.iloc[::-1]]),
+        y=pd.concat([results["P95_Volatility_Pct"], results["P05_Volatility_Pct"].iloc[::-1]]),
+        fill="toself", fillcolor="rgba(169,216,245,.55)", line=dict(color="rgba(0,0,0,0)"),
+        name="5th–95th percentile", hoverinfo="skip",
     ))
-curve.update_layout(
-    height=520, margin=dict(l=55, r=25, t=20, b=50),
-    xaxis_title="Number of Stocks", yaxis_title="Annualized Portfolio Standard Deviation (%)",
-    xaxis=dict(range=[0, 510], tickvals=[1, 30, 100, 300, 500], gridcolor="#edf2f5"),
-    yaxis=dict(range=[0, 65], gridcolor="#dce6ec"),
-    plot_bgcolor="white", paper_bgcolor="white", legend=dict(orientation="h", y=1.08),
-    font=dict(size=14),
-)
-st.plotly_chart(curve, width="stretch", config={"displaylogo": False})
+    curve.add_trace(go.Scatter(
+        x=x, y=results["Average_Volatility_Pct"], mode="lines+markers",
+        line=dict(color="#1769AA", width=3), name="Average of 1,000 random portfolios",
+    ))
+    spy_vol = float(results["SPY_Volatility_Pct"].iloc[0])
+    curve.add_hline(
+        y=spy_vol, line=dict(color="#C43D3D", width=2, dash="dash"),
+        annotation_text=f"S&P 500 benchmark: {spy_vol:.1f}%",
+        annotation_position="bottom right",
+    )
+
+    label_positions = {
+        1: "top right", 3: "top left", 10: "top right", 30: "top center", 100: "top center"
+    }
+    for size in random_sizes:
+        if size in random_results:
+            result = random_results[size]
+            curve.add_trace(go.Scatter(
+                x=[size], y=[result["sd"]], mode="markers+text",
+                text=[f"N={size}"], textposition=label_positions[size],
+                marker=dict(
+                    symbol="star", size=20, color=random_palette[size],
+                    line=dict(color="white", width=1.5),
+                ),
+                name=f"Random {size}-stock portfolio",
+                hovertemplate=(
+                    f"Random {size}-stock portfolio<br>Annualized SD: "
+                    f"{result['sd']:.2f}%<extra></extra>"
+                ),
+                showlegend=False,
+            ))
+
+    history = st.session_state.portfolio_history
+    if history:
+        hx, hy = zip(*history)
+        curve.add_trace(go.Scatter(
+            x=hx, y=hy, mode="markers", marker=dict(
+                symbol="diamond", size=11, color="#7A5AF8",
+                line=dict(color="white", width=1),
+            ), name="Student-built portfolio",
+        ))
+
+    if random_results:
+        curve.add_annotation(
+            xref="paper", yref="paper", x=.68, y=.88, showarrow=False, align="left",
+            text=(
+                "<b>What should we conclude?</b><br>"
+                "Start with one stock, then compare N=3 and N=10.<br>"
+                "The first few stocks provide the largest<br>"
+                "diversification benefit. As more stocks are<br>"
+                "added, the extra risk reduction gets smaller.<br>"
+                "Common market risk remains."
+            ),
+            bgcolor="#DFF3FB", bordercolor="#1769AA", borderwidth=2,
+            borderpad=9, font=dict(size=12, color="#153B57"),
+        )
+
+    random_ymax = max(
+        [65.0] + [result["sd"] * 1.15 for result in random_results.values()]
+    )
+    curve.update_layout(
+        height=500, margin=dict(l=58, r=20, t=20, b=48),
+        xaxis_title="Number of Stocks", yaxis_title="Annualized Portfolio Standard Deviation (%)",
+        xaxis=dict(
+            type="log", range=[0, np.log10(550)],
+            tickvals=[1, 3, 10, 30, 100, 300, 500], gridcolor="#edf2f5",
+        ),
+        yaxis=dict(range=[0, random_ymax], gridcolor="#dce6ec"),
+        plot_bgcolor="white", paper_bgcolor="white", legend=dict(orientation="h", y=1.08),
+        font=dict(size=13),
+    )
+    st.plotly_chart(curve, width="stretch", config={"displaylogo": False})
 
 st.caption(
     "Daily constant-weight portfolios using real adjusted-price returns from 2021–2025. "
