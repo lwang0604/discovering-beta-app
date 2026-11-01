@@ -422,16 +422,16 @@ with chart_col:
             borderpad=15, font=dict(size=16, color="#153B57"),
         )
         curve.add_annotation(
-            xref="paper", yref="paper", x=.69, y=.34, showarrow=False, align="left",
+            xref="paper", yref="paper", x=.69, y=.235, yanchor="top",
+            showarrow=False, align="left",
             text=(
                 "<b>Market Risk</b><br>"
                 "The risk that remains even if the portfolio holds every stock.<br>"
-                "It comes from factors that systematically affect most firms.<br>"
-                "Examples: war, inflation, recessions, and high interest rates.<br>"
+                "Caused by macro factors: war, inflation, recessions, and high interest rates.<br>"
                 "<b>Market risk cannot be eliminated by diversification.</b>"
             ),
             bgcolor="#FFF0E8", bordercolor="#C43D3D", borderwidth=2,
-            borderpad=15, font=dict(size=16, color="#6F2525"),
+            borderpad=12, font=dict(size=14, color="#6F2525"),
         )
 
     random_ymax = max(
