@@ -20,6 +20,11 @@ st.markdown(
     .subtitle {font-size:1.12rem; color:#415463; margin-bottom:1rem;}
     .result-box {background:#fff3c4; border-left:7px solid #e5aa00; border-radius:9px;
                  padding:13px 16px; font-size:1.03rem; line-height:1.5;}
+    .movement-card {background:#ffe66d; border:1px solid #dfbd24; border-radius:12px;
+                    padding:14px 18px; margin:12px 0 16px 0; text-align:center;}
+    .movement-title {font-size:1.05rem; font-weight:750; color:#263942;}
+    .movement-value {font-size:2.35rem; font-weight:850; color:#153b57; line-height:1.15;}
+    .movement-note {font-size:.94rem; color:#334851; margin-top:5px;}
     .selected-box {background:#eaf5fa; border:1px solid #b7d9e8; border-radius:10px;
                    padding:10px 14px; font-size:1rem;}
     div.stButton > button {font-size:1.03rem; font-weight:700; border-radius:9px;}
@@ -58,6 +63,12 @@ if "portfolio_history" not in st.session_state:
     st.session_state.portfolio_history = []
 if "last_comparison" not in st.session_state:
     st.session_state.last_comparison = None
+if "portfolio_weights" not in st.session_state:
+    st.session_state.portfolio_weights = {}
+if "weight_version" not in st.session_state:
+    st.session_state.weight_version = 0
+if "custom_weight_result" not in st.session_state:
+    st.session_state.custom_weight_result = None
 
 st.title("Diversification Challenge")
 st.markdown(
@@ -85,6 +96,9 @@ if clear_clicked:
     st.session_state.portfolio_tickers = []
     st.session_state.portfolio_history = []
     st.session_state.last_comparison = None
+    st.session_state.portfolio_weights = {}
+    st.session_state.custom_weight_result = None
+    st.session_state.weight_version += 1
     st.rerun()
 
 if add_clicked:
@@ -100,7 +114,11 @@ if add_clicked:
         correlation = None
         if previous:
             before_frame = returns[previous].dropna()
-            before_returns = before_frame.mean(axis=1)
+            prior_weights = st.session_state.portfolio_weights
+            if set(prior_weights) == set(previous):
+                before_returns = before_frame.mul(pd.Series(prior_weights)).sum(axis=1)
+            else:
+                before_returns = before_frame.mean(axis=1)
             before_sd = annualized_sd(before_returns)
             paired = pd.concat([returns[ticker], before_returns.rename("Portfolio")], axis=1).dropna()
             correlation = float(paired.iloc[:, 0].corr(paired.iloc[:, 1]))
@@ -109,6 +127,9 @@ if add_clicked:
         after_sd = annualized_sd(after_returns)
         selected.append(ticker)
         total = len(selected)
+        st.session_state.portfolio_weights = {symbol: 1 / total for symbol in selected}
+        st.session_state.custom_weight_result = None
+        st.session_state.weight_version += 1
         st.session_state.portfolio_history.append((total, after_sd))
         st.session_state.last_comparison = {
             "ticker": ticker, "stock_sd": stock_sd, "before_sd": before_sd,
@@ -124,6 +145,48 @@ if selected:
         + ", ".join(selected) + "</div>",
         unsafe_allow_html=True,
     )
+
+    with st.expander("Change Portfolio Weights", expanded=False):
+        st.write("Enter each weight as a percentage. The total must equal 100%.")
+        input_weights = {}
+        cols = st.columns(min(4, len(selected)))
+        for idx, symbol in enumerate(selected):
+            with cols[idx % len(cols)]:
+                input_weights[symbol] = st.number_input(
+                    f"{symbol} weight (%)",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=float(st.session_state.portfolio_weights.get(symbol, 1 / len(selected)) * 100),
+                    step=1.0,
+                    key=f"weight_{st.session_state.weight_version}_{symbol}",
+                )
+        total_weight = sum(input_weights.values())
+        st.write(f"**Total weight: {total_weight:.1f}%**")
+        if st.button("Apply Weights", type="primary", width="stretch"):
+            if not np.isclose(total_weight, 100.0, atol=0.05):
+                st.error("Weights must add up to 100% before they can be applied.")
+            else:
+                decimal_weights = {symbol: value / 100 for symbol, value in input_weights.items()}
+                weighted_returns = returns[selected].dropna().mul(pd.Series(decimal_weights)).sum(axis=1)
+                weighted_sd = annualized_sd(weighted_returns)
+                st.session_state.portfolio_weights = decimal_weights
+                st.session_state.custom_weight_result = {
+                    "sd": weighted_sd,
+                    "weights": input_weights.copy(),
+                }
+                if st.session_state.portfolio_history:
+                    st.session_state.portfolio_history[-1] = (len(selected), weighted_sd)
+                st.rerun()
+
+    custom_result = st.session_state.custom_weight_result
+    if custom_result:
+        weight_text = ", ".join(
+            f"{symbol} {weight:.1f}%" for symbol, weight in custom_result["weights"].items()
+        )
+        st.success(
+            f"Custom-weight portfolio risk: {custom_result['sd']:.2f}% annualized standard deviation. "
+            f"Weights: {weight_text}."
+        )
 else:
     st.info("No companies selected yet. Add the first company to begin.")
 
@@ -138,7 +201,8 @@ if comparison:
             f"{ticker} is the first stock. The portfolio's annualized standard deviation is "
             f"<b>{after_sd:.2f}%</b>."
         )
-        movement = "Not available for the first stock."
+        movement_value = "N/A"
+        movement_note = "The first stock has no existing portfolio for comparison."
     else:
         change = after_sd - before_sd
         direction = "fell" if change < 0 else "rose"
@@ -146,12 +210,17 @@ if comparison:
             f"Portfolio risk {direction} from <b>{before_sd:.2f}%</b> to <b>{after_sd:.2f}%</b> "
             f"— a change of <b>{abs(change):.2f} percentage points</b>."
         )
-        movement = (
-            f"Together-movement score with the existing portfolio: <b>{comparison['correlation']:.2f}</b>. "
-            "+1 means they move together, 0 means no clear pattern, and −1 means opposite directions."
-        )
+        movement_value = f"{comparison['correlation']:.2f}"
+        movement_note = "+1 = move together • 0 = no clear pattern • −1 = move in opposite directions"
     st.markdown(
-        f'<div class="result-box"><b>Total stocks: {comparison["total"]}</b><br>{summary}<br>{movement}</div>',
+        f'<div class="result-box"><b>Total stocks: {comparison["total"]}</b><br>{summary}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="movement-card">'
+        '<div class="movement-title">Correlation coefficient with existing portfolio</div>'
+        f'<div class="movement-value">{movement_value}</div>'
+        f'<div class="movement-note">{movement_note}</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -217,5 +286,6 @@ st.plotly_chart(curve, width="stretch", config={"displaylogo": False})
 
 st.caption(
     "Daily constant-weight portfolios using real adjusted-price returns from 2021–2025. "
-    "Each selected portfolio is equally weighted and rebalanced daily. Historical results are for teaching, not investment advice."
+    "New portfolios begin equally weighted; student-entered weights are rebalanced daily. "
+    "Historical results are for teaching, not investment advice."
 )
