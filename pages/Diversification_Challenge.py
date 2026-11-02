@@ -345,7 +345,7 @@ if comparison:
         'Portfolio-Building Rule</div>'
         'A new stock generally provides a larger diversification benefit when it has '
         '<b>lower stand-alone risk</b> and a <b>lower correlation with the existing '
-        'portfolio</b>. Its portfolio weight also matters.</div>',
+        'portfolio</b>.</div>',
         unsafe_allow_html=True,
     )
 
