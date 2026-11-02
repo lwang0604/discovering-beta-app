@@ -45,6 +45,10 @@ st.markdown(
     .lesson-limited {background:#fff4d6; border-left:7px solid #e0a000; color:#624800;}
     .lesson-mixed {background:#eef4fa; border-left:7px solid #547da3; color:#29465f;}
     .lesson-title {font-size:1.12rem; font-weight:850; margin-bottom:4px;}
+    .portfolio-rule {background:#e8f7ee; border:2px solid #2ca25f; border-radius:11px;
+                     padding:13px 17px; margin:8px 0 16px 0; color:#174b2c;
+                     font-size:1.02rem; line-height:1.45;}
+    .portfolio-rule-title {font-size:1.15rem; font-weight:850; margin-bottom:3px;}
     .diminishing-card {background:#f3efff; border-left:7px solid #7656b5;
                        border-radius:11px; padding:12px 16px; margin:5px 0 10px 0;
                        color:#3e2d63; font-size:1rem; line-height:1.45;}
@@ -336,6 +340,14 @@ if comparison:
         font=dict(size=14),
     )
     st.plotly_chart(bar, width="stretch", config={"displaylogo": False})
+    st.markdown(
+        '<div class="portfolio-rule"><div class="portfolio-rule-title">'
+        'Portfolio-Building Rule</div>'
+        'A new stock generally provides a larger diversification benefit when it has '
+        '<b>lower stand-alone risk</b> and a <b>lower correlation with the existing '
+        'portfolio</b>. Its portfolio weight also matters.</div>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown("### Portfolio Size Experiment")
 control_col, chart_col = st.columns([0.82, 4.18], gap="medium")
