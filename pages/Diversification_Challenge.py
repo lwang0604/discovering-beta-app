@@ -382,10 +382,18 @@ with control_col:
     for size in random_sizes:
         if size in random_results:
             result = random_results[size]
+            selected_tickers = result["tickers"]
+            if size <= 10:
+                ticker_text = ", ".join(selected_tickers)
+            else:
+                ticker_text = ", ".join(selected_tickers[:8])
+                ticker_text += f", and {size - 8} more"
             st.markdown(
                 f'<div class="random-result"><span style="color:{random_palette[size]};'
                 f'font-size:1.25rem">★</span> <b>{size} stocks:</b> '
-                f'{result["sd"]:.2f}%</div>',
+                f'{result["sd"]:.2f}%<br>'
+                f'<span style="font-size:.78rem;color:#52636d"><b>Selected:</b> '
+                f'{ticker_text}</span></div>',
                 unsafe_allow_html=True,
             )
     if random_results and st.button("Clear random results", width="stretch"):
@@ -441,6 +449,9 @@ with chart_col:
     for size in random_sizes:
         if size in random_results:
             result = random_results[size]
+            hover_tickers = ", ".join(result["tickers"][:12])
+            if size > 12:
+                hover_tickers += f", and {size - 12} more"
             curve.add_trace(go.Scatter(
                 x=[size], y=[result["sd"]], mode="markers+text",
                 text=[f"N={size}"], textposition=label_positions[size],
@@ -451,7 +462,7 @@ with chart_col:
                 name=f"Random {size}-stock portfolio",
                 hovertemplate=(
                     f"Random {size}-stock portfolio<br>Annualized SD: "
-                    f"{result['sd']:.2f}%<extra></extra>"
+                    f"{result['sd']:.2f}%<br>Selected: {hover_tickers}<extra></extra>"
                 ),
                 showlegend=False,
             ))
