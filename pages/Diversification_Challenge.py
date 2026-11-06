@@ -92,6 +92,24 @@ def annualized_sd(series: pd.Series) -> float:
     return float(series.dropna().std(ddof=1) * ANNUALIZATION)
 
 
+def record_portfolio_step(event, ticker, stock_sd, correlation, before_sd, after_sd):
+    """Keep a snapshot of each action; subsequent additions must not rewrite it."""
+    weights = st.session_state.portfolio_weights
+    st.session_state.portfolio_build_log.append({
+        "Step": len(st.session_state.portfolio_build_log) + 1,
+        "Action": event,
+        "Added stock": ticker if ticker is not None else "Weights changed",
+        "Stock risk (%)": stock_sd,
+        "Correlation with prior portfolio": correlation,
+        "Prior portfolio risk (%)": before_sd,
+        "New portfolio risk (%)": after_sd,
+        "Risk change (pp)": None if before_sd is None else after_sd - before_sd,
+        "Holdings / weights": ", ".join(
+            f"{symbol} {weight * 100:.2f}%" for symbol, weight in weights.items()
+        ),
+    })
+
+
 returns, universe, results = load_data("diversification-web-v1")
 company_to_ticker = dict(zip(universe["Company"], universe["Ticker"]))
 
@@ -99,6 +117,8 @@ if "portfolio_tickers" not in st.session_state:
     st.session_state.portfolio_tickers = []
 if "portfolio_history" not in st.session_state:
     st.session_state.portfolio_history = []
+if "portfolio_build_log" not in st.session_state:
+    st.session_state.portfolio_build_log = []
 if "last_comparison" not in st.session_state:
     st.session_state.last_comparison = None
 if "portfolio_weights" not in st.session_state:
@@ -144,6 +164,7 @@ with st.expander(
 if clear_clicked:
     st.session_state.portfolio_tickers = []
     st.session_state.portfolio_history = []
+    st.session_state.portfolio_build_log = []
     st.session_state.last_comparison = None
     st.session_state.portfolio_weights = {}
     st.session_state.custom_weight_result = None
@@ -184,6 +205,7 @@ if add_clicked:
             "ticker": ticker, "stock_sd": stock_sd, "before_sd": before_sd,
             "after_sd": after_sd, "correlation": correlation, "total": total,
         }
+        record_portfolio_step("Add stock", ticker, stock_sd, correlation, before_sd, after_sd)
         st.rerun()
 
 selected = st.session_state.portfolio_tickers
@@ -219,6 +241,10 @@ if selected:
                 if not np.isclose(total_weight, 100.0, atol=0.05):
                     st.error("Weights must add up to 100% before they can be applied.")
                 else:
+                    previous_returns = returns[selected].dropna().mul(
+                        pd.Series(st.session_state.portfolio_weights)
+                    ).sum(axis=1)
+                    previous_sd = annualized_sd(previous_returns)
                     decimal_weights = {symbol: value / 100 for symbol, value in input_weights.items()}
                     weighted_returns = returns[selected].dropna().mul(pd.Series(decimal_weights)).sum(axis=1)
                     weighted_sd = annualized_sd(weighted_returns)
@@ -229,6 +255,9 @@ if selected:
                     }
                     if st.session_state.portfolio_history:
                         st.session_state.portfolio_history[-1] = (len(selected), weighted_sd)
+                    record_portfolio_step(
+                        "Change weights", None, None, None, previous_sd, weighted_sd,
+                    )
                     st.rerun()
     else:
         st.caption("The weight editor is available for portfolios of up to 30 stocks.")
@@ -347,6 +376,43 @@ if comparison:
         '<b>lower stand-alone risk</b> and a <b>lower correlation with the existing '
         'portfolio</b>.</div>',
         unsafe_allow_html=True,
+    )
+
+if st.session_state.portfolio_build_log:
+    st.subheader("Our Portfolio: Step by Step")
+    st.caption(
+        "Each row preserves the result at that step. Risk is annualized standard deviation. "
+        "Correlation is measured against the portfolio before the addition. "
+        "A negative risk change means risk fell; pp means percentage points."
+    )
+    build_log = pd.DataFrame(st.session_state.portfolio_build_log)
+    number_columns = [
+        "Stock risk (%)", "Correlation with prior portfolio",
+        "Prior portfolio risk (%)", "New portfolio risk (%)", "Risk change (pp)",
+    ]
+    st.dataframe(
+        build_log,
+        hide_index=True,
+        width="stretch",
+        height=min(560, 38 + 36 * len(build_log)),
+        column_order=["Step", "Added stock", *number_columns],
+        column_config={
+            name: st.column_config.NumberColumn(format="%.2f")
+            for name in number_columns
+        },
+    )
+    st.caption(
+        "Adding a company resets all holdings to equal weights. "
+        "Weight changes are recorded separately; the CSV also includes holdings and weights. "
+        "Records last for this browser session; "
+        "download them before clearing the portfolio or refreshing the page."
+    )
+    st.download_button(
+        "Download portfolio history (CSV)",
+        data=build_log.to_csv(index=False).encode("utf-8-sig"),
+        file_name="portfolio_build_history.csv",
+        mime="text/csv",
+        on_click="ignore",
     )
 
 st.markdown("### Portfolio Size Experiment")
