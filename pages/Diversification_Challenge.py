@@ -390,6 +390,7 @@ if st.session_state.portfolio_build_log:
         "Stock risk (%)", "Correlation with prior portfolio",
         "Prior portfolio risk (%)", "New portfolio risk (%)", "Risk change (pp)",
     ]
+    display_labels = ["Stock SD (%)", "Corr.", "Before (%)", "After (%)", "Change (pp)"]
     st.dataframe(
         build_log,
         hide_index=True,
@@ -397,8 +398,8 @@ if st.session_state.portfolio_build_log:
         height=min(560, 38 + 36 * len(build_log)),
         column_order=["Step", "Added stock", *number_columns],
         column_config={
-            name: st.column_config.NumberColumn(format="%.2f")
-            for name in number_columns
+            name: st.column_config.NumberColumn(label=label, format="%.2f", width="small")
+            for name, label in zip(number_columns, display_labels)
         },
     )
     st.caption(
